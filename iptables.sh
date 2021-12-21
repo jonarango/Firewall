@@ -97,28 +97,29 @@ iptables -A INPUT -i lo -j ACCEPT
 # Allow OUTPUT traffic in router
 #iptables -A OUTPUT -j ACCEPT # Accepts all the output packets from the router
 iptables -A OUTPUT -p udp -j ACCEPT # UDP Its the most used protocol 
-iptables -A OUTPUT -p udp --dport 53 -j ACCEPT # DNS 
+iptables -A OUTPUT -p udp --dport 53 -j ACCEPT # DNS
+iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT # DNS
 iptables -A OUTPUT -p icmp -j ACCEPT # Pings
 
 # Allow SSH (alternate port)
-iptables -A FORWARD -p tcp --dport $SSH_PORT -j LOG --log-level 7 --log-prefix "[-] Accept $SSH_PORT ssh"   #
-iptables -A FORWARD -p tcp -d $SSH_LANIP --dport $SSH_PORT -j ACCEPT                                        # ssh
-printf "    [o] iptables -A FORWARD -p tcp -d $SSH_LANIP --dport $SSH_PORT -j ACCEPT\n"                     #
+iptables -A FORWARD -p tcp --dport $SSH_PORT -j LOG --log-prefix "[-] Accept $SSH_PORT ssh: " --log-level 7   #
+iptables -A FORWARD -p tcp -d $SSH_LANIP --dport $SSH_PORT -j ACCEPT                                          # ssh
+printf "    [o] iptables -A FORWARD -p tcp -d $SSH_LANIP --dport $SSH_PORT -j ACCEPT\n"                       #
 sleep 0.1
 # Allow web server http (default port)
-iptables -A FORWARD -p tcp --dport 80 -j LOG --log-level 7 --log-prefix "[-] Accept 80 HTTP"                #
-iptables -A FORWARD -p tcp -d $HTTP_LANIP --dport 80 -j ACCEPT                                              # http
-printf "    [o] iptables -A FORWARD -p tcp -d $HTTP_LANIP --dport 80 -j ACCEPT\n"                           #
+iptables -A FORWARD -p tcp --dport 80 -j LOG --log-prefix "[-] Accept 80 HTTP: " --log-level 7                #
+iptables -A FORWARD -p tcp --dport 80 -d $HTTP_LANIP -m limit --limit 25/minute --limit-burst 100 -j ACCEPT   # http (prevent DoS Attacks)
+printf "    [o] iptables -A FORWARD -p tcp -d $HTTP_LANIP --dport 80 -j ACCEPT\n"                             #
 sleep 0.1
 # Allow web server https (default port)
-iptables -A FORWARD -p tcp --dport 443 -j LOG --log-level 7 --log-prefix "[-] Accept 443 HTTPS"             #
-iptables -A FORWARD -p tcp -d $HTTP_LANIP --dport 443 -j ACCEPT                                             # https
-printf "    [o] iptables -A FORWARD -p tcp -d $HTTP_LANIP --dport 443 -j ACCEPT\n"                          #
+iptables -A FORWARD -p tcp --dport 443 -j LOG --log-prefix "[-] Accept 443 HTTPS: " --log-level 7             #
+iptables -A FORWARD -p tcp --dport 443 -d $HTTP_LANIP -m limit --limit 25/minute --limit-burst 100 -j ACCEPT  # https
+printf "    [o] iptables -A FORWARD -p tcp -d $HTTP_LANIP --dport 443 -j ACCEPT\n"                            #
 sleep 0.1
 # Allow mail server (alternative port)
-iptables -A FORWARD -p tcp --dport $MAIL_PORT -j LOG --log-level 7 --log-prefix "[-] Accept $MAIL_PORT MAIL"#
-iptables -A FORWARD -p tcp -d $MAIL_LANIP --dport $MAIL_PORT -j ACCEPT                                      # mail
-printf "    [o] iptables -A FORWARD -p tcp -d $MAIL_LANIP --dport $MAIL_PORT -j ACCEPT\n"                   #
+iptables -A FORWARD -p tcp --dport $MAIL_PORT -j LOG --log-prefix "[-] Accept $MAIL_PORT MAIL: " --log-level 7 #
+iptables -A FORWARD -p tcp -d $MAIL_LANIP --dport $MAIL_PORT -j ACCEPT                                         # mail
+printf "    [o] iptables -A FORWARD -p tcp -d $MAIL_LANIP --dport $MAIL_PORT -j ACCEPT\n"                      #
 sleep 0.1
 # Allow ping (default port)
 #iptables -A FORWARD -p icmp -j LOG --log-level 7 --log-prefix "[-] Accept ping"                             #
@@ -126,19 +127,45 @@ sleep 0.1
 #printf "    [o] iptables -A FORWARD -p icmp -j ACCEPT\n"                                                    #
 #sleep 0.1
 # Allow DNS (default port)
-iptables -A FORWARD -p udp --dport 53 -j LOG --log-level 7 --log-prefix "[-] Accept DNS"                    #
-iptables -A FORWARD -p udp --dport 53 -j ACCEPT                                                             # DNS
-printf "    [o] iptables -A FORWARD -p udp --dport 53 -j ACCEPT \n"                                         #
+iptables -A FORWARD -p udp --dport 53 -j LOG --log-prefix "[-] Accept DNS: " --log-level 7                      #
+iptables -A FORWARD -p udp --dport 53 -j ACCEPT                                                                 # DNS
+printf "    [o] iptables -A FORWARD -p udp --dport 53 -j ACCEPT \n"                                             #
 sleep 0.1
-iptables -A FORWARD -s $LAN -j LOG --log-level 7 --log-prefix "[-] LAN to Outside"                          #
-iptables -A FORWARD -s $LAN -j ACCEPT                                                                       # From inside to outside
-printf "    [o] iptables -A FORWARD -p udp --dport 53 -j ACCEPT \n"                                         #
+iptables -A FORWARD -s $LAN -j LOG --log-prefix "[-] LAN to Outside: "  --log-level 7                           #
+iptables -A FORWARD -s $LAN -j ACCEPT                                                                           # From inside to outside
+printf "    [o] iptables -A FORWARD -p udp --dport 53 -j ACCEPT \n"                                             #
+sleep 0.1
+
+
+#############################
+#   PROTECTIONS
+#############################
+printf '[!] Setting Up Protections\n'
+iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP    # Kill SYN attacks
+printf "    [o] Blocking SYN attacks\n"   
+sleep 0.1
+iptables -A INPUT -f -j DROP                                     # Drop fragments
+printf "    [o] Blocking Drop Fragments\n"   
+sleep 0.1
+iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP             # Drop XMAS packets
+printf "    [o] Blocking XMAS packets\n"   
+sleep 0.1
+iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP            # Drop NULL packets
+printf "    [o] Blocking  NULL packets\n"   
 sleep 0.1
 
 #############################
-#  DEFAULT DENY
+#   DEFAULT DENY
 #############################
-
-iptables -A FORWARD -d 0.0.0.0/0 -j LOG --log-level 7 --log-prefix "[-] Default Deny"
-iptables -A FORWARD -j DROP
+printf '[!] Creating logger!\n'
+iptables -N LOGGING
+printf "    [o] Created \n"   
+sleep 0.1
+iptables -A FORWARD -j LOGGING
+printf "    [o] Set  as FORWARD\n"
+iptables -A LOGGING -m limit --limit 5/min -j LOG --log-prefix "[-] IPTABLES Dropped: " --log-level 6
+printf "    [o] Added log limit in: 5/min\n"
+iptables -A LOGGING -j DROP
 printf '[!] Set Up Success!\n'
+
+printf '[!] Check Firewall logs in: /var/log/syslog\n'
