@@ -130,8 +130,8 @@ iptables -A FORWARD -p udp --dport 53 -j LOG --log-level 7 --log-prefix "[-] Acc
 iptables -A FORWARD -p udp --dport 53 -j ACCEPT                                                             # DNS
 printf "    [o] iptables -A FORWARD -p udp --dport 53 -j ACCEPT \n"                                         #
 sleep 0.1
-iptables -A FORWARD -s $LAN -j LOG --log-level 7 --log-prefix "[-] LAN to Outside"                    #
-iptables -A FORWARD -s $LAN -j ACCEPT                                                             # From inside to outside
+iptables -A FORWARD -s $LAN -j LOG --log-level 7 --log-prefix "[-] LAN to Outside"                          #
+iptables -A FORWARD -s $LAN -j ACCEPT                                                                       # From inside to outside
 printf "    [o] iptables -A FORWARD -p udp --dport 53 -j ACCEPT \n"                                         #
 sleep 0.1
 
