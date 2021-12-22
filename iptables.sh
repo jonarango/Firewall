@@ -2,6 +2,7 @@
 
 #iptables.sh
 printf '[!] Starting...\n'
+clear
 #Check if the script is running with sudo permissions
 if [ "$EUID" -ne 0 ]
   then echo "[x] Please run as root\n"
@@ -12,6 +13,7 @@ fi
 # Define your hostname and services ips
 PUBLIC_HOSTNAME=10.10.10.100
 LAN=192.168.100.0/24
+WAN=10.10.10.100/24
 SSH_LANIP=192.168.100.9
 HTTP_LANIP=192.168.100.3
 MAIL_LANIP=192.168.100.9
@@ -21,6 +23,7 @@ SSH_PORT=6969
 MAIL_PORT=9090
 
 #Lan port
+WAN_PORT=eth0
 LAN_PORT=net_local
 
 #Cool Functions
@@ -39,7 +42,7 @@ printf '[!] Old Firewall Rules\n'
 printf '[!] Cleaning old firewall rules! '
 iptables -F
 spinner &
-sleep 5
+sleep 3
 kill "$!" # kill the spinner
 printf '\n'
 printf '[!] Clean Up Success!\n'
@@ -49,30 +52,21 @@ sleep 0.1
 printf '[!] IP Fordwarding!\n'
 sleep 0.1
 echo 1 > /proc/sys/net/ipv4/ip_forward
+echo 1 > /proc/sys/net/ipv4/conf/$WAN_PORT/forwarding
+echo 1 > /proc/sys/net/ipv4/conf/$LAN_PORT/forwarding
 printf '    [o] Enabled Ip Forwarding\n'
 sleep 0.1
 
 
-#Source Nat 
-printf '[!] Creating Source nat\n'
-iptables -t nat -A POSTROUTING  -o vmbr1 -j MASQUERADE
-sleep 0.1
-printf '    [o] iptables -t nat -A POSTROUTING  -o vmbr1 -j MASQUERADE\n'
 
-#Destination Nat
-printf '[!] Creating Destination nat\n'
-iptables -t nat -A PREROUTING -p tcp --dport 443 -i $LAN_PORT -j DNAT --to-destination $HTTP_LANIP #https
-printf "    [o] Added Port 443/https for $HTTP_LANIP\n" 
+#############################
+#        Source Nat 
+#############################
+printf '[!] Creating Source nat\n'
+iptables -t nat -A POSTROUTING  -o $WAN_PORT -j MASQUERADE
 sleep 0.1
-iptables -t nat -A PREROUTING -p tcp --dport 80 -i $LAN_PORT -j DNAT --to-destination $HTTP_LANIP #http
-printf "    [o] Added Port 80/http for $HTTP_LANI\n"
-sleep 0.1
-iptables -t nat -A PREROUTING -p tcp --dport $SSH_PORT -i $LAN_PORT -j DNAT --to-destination $SSH_LANIP #ssh
-printf "    [o] Added Port $SSH_PORT/ssh for $SSH_LANIP\n"
-sleep 0.1
-iptables -t nat -A PREROUTING -p tcp --dport $MAIL_PORT -i $LAN_PORT -j DNAT --to-destination $MAIL_LANIP #mail
-printf "    [o] Added Port $MAIL_PORT/mail for $MAIL_LANIP\n"
-sleep 0.1
+printf '    [o] iptables -t nat -A POSTROUTING  -o $WAN_PORT -j MASQUERADE\n'
+
 
 #############################
 #  IPTABLES CONFIGURATION
@@ -94,14 +88,20 @@ sleep 0.1
 
 # Allow localhost traffic
 iptables -A INPUT -i lo -j ACCEPT
-# Allow OUTPUT traffic in router
-#iptables -A OUTPUT -j ACCEPT # Accepts all the output packets from the router
-iptables -A OUTPUT -p udp -j ACCEPT # UDP Its the most used protocol 
-iptables -A OUTPUT -p udp --dport 53 -j ACCEPT # DNS
-iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT # DNS
-iptables -A OUTPUT -p icmp -j ACCEPT # Pings
 
-# Allow SSH (alternate port)
+# Allow OUTPUT traffic in router
+iptables -A OUTPUT -j ACCEPT # Accepts all the output packets from the router
+#iptables -A OUTPUT -p udp -j ACCEPT # UDP Its the most used protocol 
+#iptables -A OUTPUT -p udp --dport 53 -j ACCEPT # DNS
+#iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT # DNS
+#iptables -A OUTPUT -p icmp -j ACCEPT # Pings
+
+
+iptables -A FORWARD -s $LAN -j LOG --log-prefix "[-] LAN to Outside: "  --log-level 7                           #
+iptables -A FORWARD -s $LAN -j ACCEPT                                                                           # From inside to outside
+printf "    [o] iptables -A FORWARD -s $LAN -j ACCEPT \n"                                             #
+sleep 0.1
+# Allow SSH (alternative port)
 iptables -A FORWARD -p tcp --dport $SSH_PORT -j LOG --log-prefix "[-] Accept $SSH_PORT ssh: " --log-level 7   #
 iptables -A FORWARD -p tcp -d $SSH_LANIP --dport $SSH_PORT -j ACCEPT                                          # ssh
 printf "    [o] iptables -A FORWARD -p tcp -d $SSH_LANIP --dport $SSH_PORT -j ACCEPT\n"                       #
@@ -131,10 +131,6 @@ iptables -A FORWARD -p udp --dport 53 -j LOG --log-prefix "[-] Accept DNS: " --l
 iptables -A FORWARD -p udp --dport 53 -j ACCEPT                                                                 # DNS
 printf "    [o] iptables -A FORWARD -p udp --dport 53 -j ACCEPT \n"                                             #
 sleep 0.1
-iptables -A FORWARD -s $LAN -j LOG --log-prefix "[-] LAN to Outside: "  --log-level 7                           #
-iptables -A FORWARD -s $LAN -j ACCEPT                                                                           # From inside to outside
-printf "    [o] iptables -A FORWARD -p udp --dport 53 -j ACCEPT \n"                                             #
-sleep 0.1
 
 
 #############################
@@ -151,21 +147,47 @@ iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP             # Drop XMAS pac
 printf "    [o] Blocking XMAS packets\n"   
 sleep 0.1
 iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP            # Drop NULL packets
-printf "    [o] Blocking  NULL packets\n"   
+printf "    [o] Blocking NULL packets\n"   
 sleep 0.1
 
 #############################
 #   DEFAULT DENY
 #############################
-printf '[!] Creating logger!\n'
+printf '[!] Cleaning old Chains '
+iptables -X
+spinner &
+sleep 2
+kill "$!" # kill the spinner
+printf '\n'
+printf '[!] Creating logger\n'
 iptables -N LOGGING
-printf "    [o] Created \n"   
+printf "    [o] Created Chain, name: LOGGING\n"   
 sleep 0.1
 iptables -A FORWARD -j LOGGING
-printf "    [o] Set  as FORWARD\n"
+printf "    [o] Set LOGGING as: FORWARD\n"
 iptables -A LOGGING -m limit --limit 5/min -j LOG --log-prefix "[-] IPTABLES Dropped: " --log-level 6
-printf "    [o] Added log limit in: 5/min\n"
+printf "    [o] Added LOGGING log limit in: 5/min\n"
 iptables -A LOGGING -j DROP
 printf '[!] Set Up Success!\n'
+
+
+#############################
+#       Destination Nat
+#############################
+
+#Destination Nat #Testing Removed cause apt doesnt work 
+#printf '[!] Creating Destination nat\n'
+#iptables -t nat -A PREROUTING -p tcp --dport 443 -i $LAN_PORT -j DNAT --to-destination $HTTP_LANIP #https
+#printf "    [o] Added Port 443/https for $HTTP_LANIP\n" 
+#sleep 0.1
+#iptables -t nat -A PREROUTING -p tcp --dport 80 -i $LAN_PORT -j DNAT --to-destination $HTTP_LANIP #http
+#printf "    [o] Added Port 80/http for $HTTP_LANI\n"
+#sleep 0.1
+#iptables -t nat -A PREROUTING -p tcp --dport $SSH_PORT -i $LAN_PORT -j DNAT --to-destination $SSH_LANIP #ssh
+#printf "    [o] Added Port $SSH_PORT/ssh for $SSH_LANIP\n"
+#sleep 0.1
+#iptables -t nat -A PREROUTING -p tcp --dport $MAIL_PORT -i $LAN_PORT -j DNAT --to-destination $MAIL_LANIP #mail
+#printf "    [o] Added Port $MAIL_PORT/mail for $MAIL_LANIP\n"
+#sleep 0.1
 
 printf '[!] Check Firewall logs in: /var/log/syslog\n'
