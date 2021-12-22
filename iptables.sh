@@ -67,11 +67,30 @@ iptables -t nat -A POSTROUTING  -o $WAN_PORT -j MASQUERADE
 sleep 0.1
 printf '    [o] iptables -t nat -A POSTROUTING  -o $WAN_PORT -j MASQUERADE\n'
 
+#############################
+#       Destination Nat
+#############################
+
+# Destination Nat #Testing Removed cause apt doesnt work 
+#printf '[!] Creating Destination nat\n'
+#iptables -t nat -A PREROUTING -p tcp --dport 443 -i $LAN_PORT -j DNAT --to-destination $HTTP_LANIP #https
+#printf "    [o] Added Port 443/https for $HTTP_LANIP\n" 
+#sleep 0.1
+#iptables -t nat -A PREROUTING -p tcp --dport 80 -i $LAN_PORT -j DNAT --to-destination $HTTP_LANIP #http
+#printf "    [o] Added Port 80/http for $HTTP_LANI\n"
+#sleep 0.1
+iptables -t nat -A PREROUTING -p tcp --dport $SSH_PORT -i $LAN_PORT -j DNAT --to-destination $SSH_LANIP #ssh
+printf "    [o] Added Port $SSH_PORT/ssh for $SSH_LANIP\n"
+sleep 0.1
+iptables -t nat -A PREROUTING -p tcp --dport $MAIL_PORT -i $LAN_PORT -j DNAT --to-destination $MAIL_LANIP #mail
+printf "    [o] Added Port $MAIL_PORT/mail for $MAIL_LANIP\n"
+sleep 0.1
+
 
 #############################
-#  IPTABLES CONFIGURATION
+#  IPtables CONFIGURATION
 #############################
-printf '[!] Creating IPTABLES CONFIGURATION\n'
+printf '[!] Creating IPtables CONFIGURATION\n'
 iptables -P INPUT DROP
 iptables -P FORWARD DROP
 iptables -P OUTPUT DROP
@@ -102,56 +121,38 @@ iptables -A FORWARD -s $LAN -j ACCEPT                                           
 printf "    [o] iptables -A FORWARD -s $LAN -j ACCEPT \n"                                             #
 sleep 0.1
 # Allow SSH (alternative port)
-iptables -A FORWARD -p tcp --dport $SSH_PORT -j LOG --log-prefix "[-] Accept $SSH_PORT ssh: " --log-level 7   #
+iptables -A FORWARD -p tcp --dport $SSH_PORT -j LOG --log-prefix "[IPTABLES] Accept p$SSH_PORT ssh: " --log-level 7   #
 iptables -A FORWARD -p tcp -d $SSH_LANIP --dport $SSH_PORT -j ACCEPT                                          # ssh
 printf "    [o] iptables -A FORWARD -p tcp -d $SSH_LANIP --dport $SSH_PORT -j ACCEPT\n"                       #
 sleep 0.1
 # Allow web server http (default port)
-iptables -A FORWARD -p tcp --dport 80 -j LOG --log-prefix "[-] Accept 80 HTTP: " --log-level 7                #
+iptables -A FORWARD -p tcp --dport 80 -j LOG --log-prefix "[IPTABLES] Accept p80 HTTP: " --log-level 7                #
 iptables -A FORWARD -p tcp --dport 80 -d $HTTP_LANIP -m limit --limit 25/minute --limit-burst 100 -j ACCEPT   # http (prevent DoS Attacks)
 printf "    [o] iptables -A FORWARD -p tcp -d $HTTP_LANIP --dport 80 -j ACCEPT\n"                             #
 sleep 0.1
 # Allow web server https (default port)
-iptables -A FORWARD -p tcp --dport 443 -j LOG --log-prefix "[-] Accept 443 HTTPS: " --log-level 7             #
+iptables -A FORWARD -p tcp --dport 443 -j LOG --log-prefix "[IPTABLES] Accept p443 HTTPS: " --log-level 7             #
 iptables -A FORWARD -p tcp --dport 443 -d $HTTP_LANIP -m limit --limit 25/minute --limit-burst 100 -j ACCEPT  # https
 printf "    [o] iptables -A FORWARD -p tcp -d $HTTP_LANIP --dport 443 -j ACCEPT\n"                            #
 sleep 0.1
 # Allow mail server (alternative port)
-iptables -A FORWARD -p tcp --dport $MAIL_PORT -j LOG --log-prefix "[-] Accept $MAIL_PORT MAIL: " --log-level 7 #
+iptables -A FORWARD -p tcp --dport $MAIL_PORT -j LOG --log-prefix "[IPTABLES] Accept p$MAIL_PORT MAIL: " --log-level 7 #
 iptables -A FORWARD -p tcp -d $MAIL_LANIP --dport $MAIL_PORT -j ACCEPT                                         # mail
 printf "    [o] iptables -A FORWARD -p tcp -d $MAIL_LANIP --dport $MAIL_PORT -j ACCEPT\n"                      #
 sleep 0.1
 # Allow ping (default port)
-#iptables -A FORWARD -p icmp -j LOG --log-level 7 --log-prefix "[-] Accept ping"                             #
+#iptables -A FORWARD -p icmp -j LOG --log-level 7 --log-prefix "[IPTABLES] Accept ping"                             #
 #iptables -A FORWARD -p icmp -j ACCEPT                                                                       # ping
 #printf "    [o] iptables -A FORWARD -p icmp -j ACCEPT\n"                                                    #
 #sleep 0.1
 # Allow DNS (default port)
-iptables -A FORWARD -p udp --dport 53 -j LOG --log-prefix "[-] Accept DNS: " --log-level 7                      #
+iptables -A FORWARD -p udp --dport 53 -j LOG --log-prefix "[IPTABLES] Accept DNS: " --log-level 7                      #
 iptables -A FORWARD -p udp --dport 53 -j ACCEPT                                                                 # DNS
 printf "    [o] iptables -A FORWARD -p udp --dport 53 -j ACCEPT \n"                                             #
 sleep 0.1
 
-
 #############################
-#   PROTECTIONS
-#############################
-printf '[!] Setting Up Protections\n'
-iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP    # Kill SYN attacks
-printf "    [o] Blocking SYN attacks\n"   
-sleep 0.1
-iptables -A INPUT -f -j DROP                                     # Drop fragments
-printf "    [o] Blocking Drop Fragments\n"   
-sleep 0.1
-iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP             # Drop XMAS packets
-printf "    [o] Blocking XMAS packets\n"   
-sleep 0.1
-iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP            # Drop NULL packets
-printf "    [o] Blocking NULL packets\n"   
-sleep 0.1
-
-#############################
-#   DEFAULT DENY
+#   Clean Old Chains
 #############################
 printf '[!] Cleaning old Chains '
 iptables -X
@@ -159,35 +160,44 @@ spinner &
 sleep 2
 kill "$!" # kill the spinner
 printf '\n'
+
+#############################
+#   PROTECTIONS             # Check https://github.com/trimstray/iptables-essential for more info
+#############################
+printf '[!] Setting Up Protections\n'
+iptables -N PROTECTIONS
+printf "    [o] Created Chain, name: PROTECTIONS\n"  
+iptables -A FORWARD -j PROTECTIONS
+printf "    [o] Set PROTECTIONS as: FORWARD\n"
+iptables -A PROTECTIONS -p tcp ! --syn -m state --state NEW -j DROP    # Kill SYN attacks
+printf "    [o] Blocking SYN attacks\n"   
+sleep 0.1
+iptables -A PROTECTIONS -f -j DROP                                     # Drop fragments
+printf "    [o] Blocking Drop Fragments\n"   
+sleep 0.1
+iptables -A PROTECTIONS -p tcp --tcp-flags ALL ALL -j DROP             # Drop XMAS packets
+printf "    [o] Blocking XMAS packets\n"   
+sleep 0.1
+iptables -A PROTECTIONS -p tcp --tcp-flags ALL NONE -j DROP            # Drop NULL packets
+printf "    [o] Blocking NULL packets\n"   
+sleep 0.1
+iptables -A PROTECTIONS -p tcp --tcp-flags SYN,ACK,FIN,RST RST -m limit --limit 1/s --limit-burst 2 -j RETURN
+iptables -A PROTECTIONS -j DROP                                        # Protection against port scanning
+printf "    [o] Blocking Port scanners\n" 
+sleep 0.1
+
+#############################
+#   DEFAULT DENY
+#############################
 printf '[!] Creating logger\n'
 iptables -N LOGGING
 printf "    [o] Created Chain, name: LOGGING\n"   
 sleep 0.1
 iptables -A FORWARD -j LOGGING
 printf "    [o] Set LOGGING as: FORWARD\n"
-iptables -A LOGGING -m limit --limit 5/min -j LOG --log-prefix "[-] IPTABLES Dropped: " --log-level 6
+iptables -A LOGGING -m limit --limit 5/min -j LOG --log-prefix "[IPTABLES] Dropped: " --log-level 6
 printf "    [o] Added LOGGING log limit in: 5/min\n"
 iptables -A LOGGING -j DROP
 printf '[!] Set Up Success!\n'
-
-
-#############################
-#       Destination Nat
-#############################
-
-#Destination Nat #Testing Removed cause apt doesnt work 
-#printf '[!] Creating Destination nat\n'
-#iptables -t nat -A PREROUTING -p tcp --dport 443 -i $LAN_PORT -j DNAT --to-destination $HTTP_LANIP #https
-#printf "    [o] Added Port 443/https for $HTTP_LANIP\n" 
-#sleep 0.1
-#iptables -t nat -A PREROUTING -p tcp --dport 80 -i $LAN_PORT -j DNAT --to-destination $HTTP_LANIP #http
-#printf "    [o] Added Port 80/http for $HTTP_LANI\n"
-#sleep 0.1
-#iptables -t nat -A PREROUTING -p tcp --dport $SSH_PORT -i $LAN_PORT -j DNAT --to-destination $SSH_LANIP #ssh
-#printf "    [o] Added Port $SSH_PORT/ssh for $SSH_LANIP\n"
-#sleep 0.1
-#iptables -t nat -A PREROUTING -p tcp --dport $MAIL_PORT -i $LAN_PORT -j DNAT --to-destination $MAIL_LANIP #mail
-#printf "    [o] Added Port $MAIL_PORT/mail for $MAIL_LANIP\n"
-#sleep 0.1
 
 printf '[!] Check Firewall logs in: /var/log/syslog\n'
