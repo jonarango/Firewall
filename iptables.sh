@@ -72,17 +72,17 @@ printf '    [o] iptables -t nat -A POSTROUTING  -o $WAN_PORT -j MASQUERADE\n'
 #############################
 
 # Destination Nat #Testing Removed cause apt doesnt work 
-#printf '[!] Creating Destination nat\n'
-#iptables -t nat -A PREROUTING -p tcp --dport 443 -i $LAN_PORT -j DNAT --to-destination $HTTP_LANIP #https
-#printf "    [o] Added Port 443/https for $HTTP_LANIP\n" 
-#sleep 0.1
-#iptables -t nat -A PREROUTING -p tcp --dport 80 -i $LAN_PORT -j DNAT --to-destination $HTTP_LANIP #http
-#printf "    [o] Added Port 80/http for $HTTP_LANI\n"
-#sleep 0.1
-iptables -t nat -A PREROUTING -p tcp --dport $SSH_PORT -i $LAN_PORT -j DNAT --to-destination $SSH_LANIP #ssh
+printf '[!] Creating Destination nat\n'
+iptables -t nat -A PREROUTING -p tcp --dport 443 -i $WAN_PORT -j DNAT --to-destination $HTTP_LANIP #https
+printf "    [o] Added Port 443/https for $HTTP_LANIP\n" 
+sleep 0.1
+iptables -t nat -A PREROUTING -p tcp --dport 80 -i $WAN_PORT -j DNAT --to-destination $HTTP_LANIP #http
+printf "    [o] Added Port 80/http for $HTTP_LANI\n"
+sleep 0.1
+iptables -t nat -A PREROUTING -p tcp --dport $SSH_PORT -i $WAN_PORT -j DNAT --to-destination $SSH_LANIP #ssh
 printf "    [o] Added Port $SSH_PORT/ssh for $SSH_LANIP\n"
 sleep 0.1
-iptables -t nat -A PREROUTING -p tcp --dport $MAIL_PORT -i $LAN_PORT -j DNAT --to-destination $MAIL_LANIP #mail
+iptables -t nat -A PREROUTING -p tcp --dport $MAIL_PORT -i $WAN_PORT -j DNAT --to-destination $MAIL_LANIP #mail
 printf "    [o] Added Port $MAIL_PORT/mail for $MAIL_LANIP\n"
 sleep 0.1
 
