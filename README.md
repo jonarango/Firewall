@@ -5,6 +5,12 @@
 
 > Simple script to configure youre firewall, made specifically for a project. its recommended to change it for your need
 
+How to Install
+```sh
+root: bash install.sh
+user: sudo bash install.sh
+```
+
 How to use
 ```sh
 root: bash iptables.sh
