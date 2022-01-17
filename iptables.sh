@@ -37,6 +37,7 @@ spinner() {
     done
 }
 
+printf '[O] Github: https://github.com/IMXNOOBX\n'
 printf '[!] Old Firewall Rules\n'
 #iptables -S
 printf '[!] Cleaning old firewall rules! '
