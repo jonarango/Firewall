@@ -42,6 +42,7 @@ printf '[!] Old Firewall Rules\n'
 #iptables -S
 printf '[!] Cleaning old firewall rules! '
 iptables -F
+iptables -t nat -F
 spinner &
 sleep 3
 kill "$!" # kill the spinner
@@ -72,7 +73,7 @@ printf '    [o] iptables -t nat -A POSTROUTING  -o $WAN_PORT -j MASQUERADE\n'
 #       Destination Nat
 #############################
 
-# Destination Nat #Testing Removed cause apt doesnt work 
+# Destination Nat 
 printf '[!] Creating Destination nat\n'
 iptables -t nat -A PREROUTING -p tcp --dport 443 -i $WAN_PORT -j DNAT --to-destination $HTTP_LANIP #https
 printf "    [o] Added Port 443/https for $HTTP_LANIP\n" 
