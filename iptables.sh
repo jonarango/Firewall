@@ -79,7 +79,7 @@ iptables -t nat -A PREROUTING -p tcp --dport 443 -i $WAN_PORT -j DNAT --to-desti
 printf "    [o] Added Port 443/https for $HTTP_LANIP\n" 
 sleep 0.1
 iptables -t nat -A PREROUTING -p tcp --dport 80 -i $WAN_PORT -j DNAT --to-destination $HTTP_LANIP #http
-printf "    [o] Added Port 80/http for $HTTP_LANI\n"
+printf "    [o] Added Port 80/http for $HTTP_LANIP\n"
 sleep 0.1
 iptables -t nat -A PREROUTING -p tcp --dport $SSH_PORT -i $WAN_PORT -j DNAT --to-destination $SSH_LANIP #ssh
 printf "    [o] Added Port $SSH_PORT/ssh for $SSH_LANIP\n"
