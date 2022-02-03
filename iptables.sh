@@ -21,6 +21,7 @@ MAIL_LANIP=192.168.100.9
 #Define ports
 SSH_PORT=6969
 MAIL_PORT=9090
+PROXY_PORT=3128
 
 #Lan port
 WAN_PORT=eth0
@@ -141,6 +142,11 @@ sleep 0.1
 iptables -A FORWARD -p tcp --dport $MAIL_PORT -j LOG --log-prefix "[IPTABLES] Accept p$MAIL_PORT MAIL: " --log-level 7 #
 iptables -A FORWARD -p tcp -d $MAIL_LANIP --dport $MAIL_PORT -j ACCEPT                                         # mail
 printf "    [o] iptables -A FORWARD -p tcp -d $MAIL_LANIP --dport $MAIL_PORT -j ACCEPT\n"                      #
+sleep 0.1
+# Allow proxy server (alternative port)
+iptables -A INPUT -p tcp --dport $PROXY_PORT -j LOG --log-prefix "[IPTABLES] Accept p$PROXY_PORT MAIL: " --log-level 7 #
+iptables -A INPUT -p tcp -s $LAN --dport $PROXY_PORT -j ACCEPT                                         # mail
+printf "    [o] iptables -A INPUT -p tcp -s $PROXY_PORT --dport $PROXY_PORT -j ACCEPT\n"                      #
 sleep 0.1
 # Allow ping (default port)
 #iptables -A FORWARD -p icmp -j LOG --log-level 7 --log-prefix "[IPTABLES] Accept ping"                             #
